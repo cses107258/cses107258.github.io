@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>APCS o711 裝飲料模擬器</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f0f8ff; }
+        .container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-top: 20px; }
+        .cup-container { position: relative; margin: 50px 0; display: flex; flex-direction: column-reverse; align-items: center; }
+        
+        /* 杯子樣式 */
+        .layer { border: 2px solid #333; border-top: none; position: relative; background: rgba(255,255,255,0.5); overflow: hidden; }
+        #bottom-layer { border-top: 2px solid transparent; } /* 下層 */
+        #top-layer { border-top: 2px solid transparent; border-bottom: none; } /* 上層 */
+
+        /* 水的樣式 */
+        .water { position: absolute; bottom: 0; left: 0; width: 100%; background-color: #3498db; transition: height 0.5s ease; }
+        
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .input-group { margin-bottom: 5px; }
+        .stats { margin-top: 10px; padding: 10px; background: #eef; border-radius: 5px; }
+        button { grid-column: span 2; padding: 10px; cursor: pointer; background: #2980b9; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #3498db; }
+    </style>
+</head>
+<body>
+
+    <h1>o711 裝飲料模擬器</h1>
+
+    <div class="container">
+        <div class="controls">
+            <div class="input-group">w1 (底寬): <input type="number" id="w1" value="10" min="1"></div>
+            <div class="input-group">h1 (底高): <input type="number" id="h1" value="10" min="1"></div>
+            <div class="input-group">w2 (頂寬): <input type="number" id="w2" value="5" min="1"></div>
+            <div class="input-group">h2 (頂高): <input type="number" id="h2" value="10" min="1"></div>
+            <button onclick="setupCup()">設定杯子尺寸</button>
+        </div>
+
+        <hr>
+
+        <div class="controls">
+            <div class="input-group">加入水量 (v): <input type="number" id="v_input" value="100"></div>
+            <button onclick="addWater()">倒入飲料</button>
+        </div>
+
+        <div class="stats">
+            <div>目前總水位：<span id="current_h">0</span> cm</div>
+            <div>本次上升量：<span id="last_inc">0</span> cm</div>
+            <div style="color: #e74c3c; font-weight: bold;">最大上升變化量：<span id="max_inc">0</span> cm</div>
+        </div>
+    </div>
+
+    <div class="cup-container" id="cup">
+        <!-- 下層 -->
+        <div id="bottom-layer" class="layer">
+            <div id="water-bottom" class="water"></div>
+        </div>
+        <!-- 上層 -->
+        <div id="top-layer" class="layer">
+            <div id="water-top" class="water"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTotalVolume = 0;
+        let currentTotalHeight = 0;
+        let maxIncrement = 0;
+        const scale = 10; // 繪圖比例
+
+        function setupCup() {
+            const w1 = parseInt(document.getElementById('w1').value);
+            const h1 = parseInt(document.getElementById('h1').value);
+            const w2 = parseInt(document.getElementById('w2').value);
+            const h2 = parseInt(document.getElementById('h2').value);
+
+            // 更新視覺杯子大小
+            const bLayer = document.getElementById('bottom-layer');
+            bLayer.style.width = (w1 * scale) + 'px';
+            bLayer.style.height = (h1 * scale) + 'px';
+
+            const tLayer = document.getElementById('top-layer');
+            tLayer.style.width = (w2 * scale) + 'px';
+            tLayer.style.height = (h2 * scale) + 'px';
+
+            // 重置狀態
+            currentTotalVolume = 0;
+            currentTotalHeight = 0;
+            maxIncrement = 0;
+            updateUI(0, 0);
+        }
+
+        function addWater() {
+            const w1 = parseInt(document.getElementById('w1').value);
+            const h1 = parseInt(document.getElementById('h1').value);
+            const w2 = parseInt(document.getElementById('w2').value);
+            const h2 = parseInt(document.getElementById('h2').value);
+            const v = parseInt(document.getElementById('v_input').value);
+
+            const v1_max = w1 * w1 * h1;
+            const v2_max = w2 * w2 * h2;
+            const total_v_max = v1_max + v2_max;
+
+            const oldHeight = currentTotalHeight;
+            currentTotalVolume = Math.min(total_v_max, currentTotalVolume + v);
+
+            // 計算新高度
+            let newHeight = 0;
+            if (currentTotalVolume <= v1_max) {
+                newHeight = currentTotalVolume / (w1 * w1);
+            } else {
+                newHeight = h1 + (currentTotalVolume - v1_max) / (w2 * w2);
+            }
+
+            const increment = newHeight - oldHeight;
+            if (increment > maxIncrement) maxIncrement = increment;
+            
+            currentTotalHeight = newHeight;
+            updateUI(increment, maxIncrement);
+        }
+
+        function updateUI(inc, max) {
+            const h1 = parseInt(document.getElementById('h1').value);
+            const h2 = parseInt(document.getElementById('h2').value);
+            
+            document.getElementById('current_h').innerText = currentTotalHeight.toFixed(2);
+            document.getElementById('last_inc').innerText = inc.toFixed(2);
+            document.getElementById('max_inc').innerText = max.toFixed(2);
+
+            // 更新水面高度動畫
+            const waterBottom = document.getElementById('water-bottom');
+            const waterTop = document.getElementById('water-top');
+
+            if (currentTotalHeight <= h1) {
+                waterBottom.style.height = (currentTotalHeight * scale) + 'px';
+                waterTop.style.height = '0px';
+            } else {
+                waterBottom.style.height = (h1 * scale) + 'px';
+                waterTop.style.height = ((currentTotalHeight - h1) * scale) + 'px';
+            }
+        }
+
+        // 初始化
+        setupCup();
+    </script>
+</body>
+</html>
